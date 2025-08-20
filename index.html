@@ -21,7 +21,6 @@
             color: #ffc400;
             text-align: center;
         }
-        /* --- NEW: Style for the scoreboard --- */
         #scoreBoard {
             font-size: 1.5em;
             color: #eee;
@@ -68,7 +67,6 @@
 <body>
 
     <h1>Gorillas Gone Bananas</h1>
-    <!-- --- NEW: Scoreboard element --- -->
     <div id="scoreBoard">Player 1: 0 - Player 2: 0</div>
     <canvas id="gameCanvas" width="800" height="500"></canvas>
     <div id="status">Player 1's Turn: Click and drag to aim!</div>
@@ -96,7 +94,6 @@
         const NUM_CLOUDS = 12;
         let clouds = [];
 
-        // --- NEW: Scoring variables ---
         let scores = [0, 0];
         const WINS_NEEDED = 3;
         let isMatchOver = false;
@@ -230,14 +227,40 @@
                 ctx.fillRect(rightArm.x, rightArm.y, rightArm.width, rightArm.height);
                 
             } else {
+                // --- MODIFIED: Handle aiming animation for the current player ---
+                // Body and head (static part)
                 ctx.fillStyle = '#2C2C2C';
                 ctx.fillRect(w * 0.1, h * 0.25, w * 0.8, h * 0.75);
                 ctx.fillRect(w * 0.3, h * 0.05, w * 0.4, h * 0.2);
                 ctx.fillStyle = '#555';
                 ctx.fillRect(w * 0.2, h * 0.4, w * 0.6, h * 0.4);
+                
+                // Static arm
                 ctx.fillStyle = '#111';
                 ctx.fillRect(player.direction === 1 ? w * 0.05 : w * 0.75, h * 0.4, w * 0.2, h * 0.4);
-                ctx.fillRect(player.direction === 1 ? w * 0.75 : w * 0.05, h * 0.4, w * 0.2, h * 0.4);
+
+                // Throwing arm (static or animated)
+                const armPivotX = player.direction === 1 ? w * 0.75 : w * 0.25;
+                const armPivotY = h * 0.4;
+                let armAngle = 0;
+
+                if (isAiming && playerIndex === currentPlayer) {
+                    const gorillaCenterX = player.x + w / 2;
+                    const gorillaCenterY = player.y + h / 2;
+                    const dx = aimEnd.x - gorillaCenterX;
+                    const dy = aimEnd.y - gorillaCenterY;
+                    armAngle = Math.atan2(dy, dx);
+                    if (player.direction === -1) {
+                         armAngle += Math.PI;
+                    }
+                }
+
+                ctx.save();
+                ctx.translate(armPivotX, armPivotY);
+                ctx.rotate(armAngle);
+                ctx.fillStyle = '#111';
+                ctx.fillRect(0, 0, w * 0.2, h * 0.4);
+                ctx.restore();
             }
             ctx.restore();
         }
@@ -262,14 +285,37 @@
             ctx.restore();
         }
         
-        // --- MODIFIED: Removed taunt check to allow banana to be held during taunt ---
+        // --- MODIFIED: Banana position now follows the aiming arm ---
         function drawHeldBanana() {
             if (!gameActive || banana || throwAnimationState) return;
+
             const player = players[currentPlayer];
             const w = GORILLA_SIZE.width;
             const h = GORILLA_SIZE.height;
-            const handX = player.x + (player.direction === 1 ? w * 0.85 : w * 0.15);
-            const handY = player.y + h * 0.6;
+            
+            let handX, handY;
+
+            if (isAiming) {
+                const gorillaCenterX = player.x + w / 2;
+                const gorillaCenterY = player.y + h / 2;
+                const dx = aimEnd.x - gorillaCenterX;
+                const dy = aimEnd.y - gorillaCenterY;
+                let armAngle = Math.atan2(dy, dx);
+                 if (player.direction === -1) {
+                    armAngle += Math.PI;
+                }
+
+                const armPivotX = player.x + (player.direction === 1 ? w * 0.75 : w * 0.25);
+                const armPivotY = player.y + h * 0.4;
+                const armLength = h * 0.4;
+
+                handX = armPivotX + Math.cos(armAngle) * armLength;
+                handY = armPivotY + Math.sin(armAngle) * armLength;
+            } else {
+                handX = player.x + (player.direction === 1 ? w * 0.85 : w * 0.15);
+                handY = player.y + h * 0.6;
+            }
+            
             drawBananaShape(handX, handY);
         }
 
@@ -306,7 +352,7 @@
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(startX, startY);
-            ctx.lineTo(startX + (aimEnd.x - aimStart.x), startY + (aimEnd.y - aimStart.y));
+            ctx.lineTo(aimEnd.x, aimEnd.y);
             ctx.stroke();
             const { angle, velocity } = getAimValues();
             ctx.fillStyle = 'white';
@@ -542,9 +588,11 @@
             const dx = aimEnd.x - aimStart.x;
             const dy = aimEnd.y - aimStart.y;
             let angle = Math.atan2(-dy, dx) * 180 / Math.PI;
-            if (currentPlayer === 1) angle = 180 - angle;
-            if (angle > 180) angle = 180;
-            if (angle < 0) angle = 0;
+            if (currentPlayer === 1) {
+                angle = 180 - angle;
+            }
+             if (angle > 180) angle = 180;
+             if (angle < 0) angle = 0;
             const distance = Math.sqrt(dx * dx + dy * dy);
             const velocity = distance * VELOCITY_MULTIPLIER;
             return { angle, velocity };
