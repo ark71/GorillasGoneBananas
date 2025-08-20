@@ -850,7 +850,8 @@
                         statusEl.textContent = 'Miss! Hit a building.';
                         banana = null;
                         hit = true;
-                        if(gameActive) setTimeout(switchPlayer, 1000);
+                        // --- BUG FIX: Removed faulty gameActive check ---
+                        setTimeout(switchPlayer, 1000);
                     }
                 }
 
