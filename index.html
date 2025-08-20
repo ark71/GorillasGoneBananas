@@ -98,7 +98,6 @@
             min-height: 25px;
             text-align: center;
         }
-        /* --- NEW: Styles for the gravity control knob --- */
         .controls-container {
             margin-top: 15px;
             display: flex;
@@ -147,7 +146,6 @@
             cursor: pointer;
             border: 3px solid #111;
         }
-
         #restartButton {
             margin-top: 15px;
             padding: 10px 25px;
@@ -182,7 +180,6 @@
     </div>
     <canvas id="gameCanvas" width="800" height="500"></canvas>
     <div id="status">Player 1's Turn: Click and drag to aim!</div>
-    <!-- --- NEW: Gravity control knob --- -->
     <div class="controls-container">
         <label for="gravityKnob">Planet: <span id="planetName">Earth</span></label>
         <input type="range" id="gravityKnob" min="0" max="4" value="2" step="1">
@@ -209,7 +206,6 @@
         const EXPLOSION_RADIUS = 30;
         const DAMAGE_AMOUNT = 5000;
         
-        // --- NEW: Gravity settings for different planets ---
         const planets = [
             { name: "Moon", value: 0.08 },
             { name: "Mars", value: 0.19 },
@@ -217,7 +213,7 @@
             { name: "Neptune", value: 0.56 },
             { name: "Jupiter", value: 1.25 }
         ];
-        let GRAVITY = planets[2].value; // Default to Earth
+        let GRAVITY = planets[2].value;
 
         const NUM_CLOUDS = 12;
         let clouds = [];
@@ -671,6 +667,9 @@
                     player.isHit = true;
                     player.vy = 0;
                     
+                    gameActive = false;
+                    tauntAnimationState = null;
+
                     const winnerIndex = 1 - index;
                     scores[winnerIndex]++;
                     updateScoreboard(winnerIndex, scores[winnerIndex]);
@@ -851,7 +850,7 @@
                         statusEl.textContent = 'Miss! Hit a building.';
                         banana = null;
                         hit = true;
-                        setTimeout(switchPlayer, 1000);
+                        if(gameActive) setTimeout(switchPlayer, 1000);
                     }
                 }
 
@@ -947,7 +946,6 @@
             }
         });
 
-        // --- NEW: Event listener for the gravity knob ---
         gravityKnob.addEventListener('input', (e) => {
             const planetIndex = parseInt(e.target.value);
             const selectedPlanet = planets[planetIndex];
