@@ -22,7 +22,6 @@
             text-align: center;
         }
         
-        /* --- MODIFIED: New scoreboard styles based on the CodePen example --- */
         .scoreboard-container {
             display: flex;
             align-items: center;
@@ -124,7 +123,6 @@
 <body>
 
     <h1>Gorillas Gone Bananas</h1>
-    <!-- --- MODIFIED: Simplified scoreboard structure --- -->
     <div class="scoreboard-container">
         <span class="player-label">Player 1</span>
         <div class="flip-card" id="p1-score" data-before="0">0</div>
@@ -153,6 +151,7 @@
         const GRAVITY = 0.5;
         const VELOCITY_MULTIPLIER = 0.5;
         const EXPLOSION_RADIUS = 30;
+        const DAMAGE_AMOUNT = 5000;
         
         const NUM_CLOUDS = 12;
         let clouds = [];
@@ -162,6 +161,8 @@
         let isMatchOver = false;
 
         let celestialBody;
+        
+        let debrisParticles = [];
 
         let buildings = [];
         let players = [
@@ -432,6 +433,13 @@
             }
         }
 
+        function drawDebris() {
+            debrisParticles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            });
+        }
+
         function drawAimLine() {
             if (!isAiming || !gameActive) return;
             const player = players[currentPlayer];
@@ -457,6 +465,7 @@
             drawCelestialBody();
             drawClouds();
             drawBuildings();
+            drawDebris();
             players.forEach((player, index) => drawGorilla(player, index));
             drawHeldBanana();
             drawBanana();
@@ -465,7 +474,6 @@
         }
 
         // --- Game Logic ---
-        // --- MODIFIED: New scoreboard logic based on CodePen ---
         function setScore(playerIndex, score) {
             const scoreCard = document.getElementById(`p${playerIndex + 1}-score`);
             scoreCard.textContent = score;
@@ -526,10 +534,17 @@
             while (currentX < canvas.width) {
                 const width = 60 + Math.random() * 60;
                 const height = 150 + Math.random() * 250;
-                const building = { x: currentX, y: canvas.height - height, width: width, height: height };
+                const building = { 
+                    x: currentX, 
+                    y: canvas.height - height, 
+                    width: width, 
+                    height: height,
+                    color: buildingColors[Math.floor(Math.random() * buildingColors.length)],
+                    health: width * height * 0.2
+                };
                 buildings.push(building);
-                const color = buildingColors[Math.floor(Math.random() * buildingColors.length)];
-                buildingCtx.fillStyle = color;
+
+                buildingCtx.fillStyle = building.color;
                 buildingCtx.fillRect(building.x, building.y, building.width, building.height);
                 const windowSize = 8;
                 const windowPadding = 12;
@@ -557,13 +572,70 @@
             tauntAnimationState = { playerIndex: opponentIndex, frame: 0 };
         }
 
-        function damageBuilding(x, y) {
+        function damageBuilding(building, x, y) {
             buildingCtx.save();
             buildingCtx.globalCompositeOperation = 'destination-out';
             buildingCtx.beginPath();
             buildingCtx.arc(x, y, EXPLOSION_RADIUS, 0, Math.PI * 2);
             buildingCtx.fill();
             buildingCtx.restore();
+
+            createDebris(x, y, 20, building.color);
+            
+            building.health -= DAMAGE_AMOUNT;
+            if (building.health <= 0) {
+                collapseBuilding(building);
+            }
+        }
+        
+        function collapseBuilding(building) {
+            if (building.isCollapsing) return;
+            building.isCollapsing = true;
+
+            for (let i = 0; i < 50; i++) {
+                const debrisX = building.x + Math.random() * building.width;
+                const debrisY = building.y + Math.random() * building.height;
+                createDebris(debrisX, debrisY, 5, building.color);
+            }
+            
+            buildingCtx.clearRect(building.x, building.y, building.width, building.height);
+
+            players.forEach((player, index) => {
+                if (!player.isHit && player.x > building.x && player.x < building.x + building.width) {
+                    player.isHit = true;
+                    player.vy = 0;
+                    
+                    const winnerIndex = 1 - index;
+                    scores[winnerIndex]++;
+                    updateScoreboard(winnerIndex, scores[winnerIndex]);
+
+                    if (scores[winnerIndex] >= WINS_NEEDED) {
+                        statusEl.textContent = `PLAYER ${winnerIndex + 1} WINS THE MATCH! 🏆`;
+                        isMatchOver = true;
+                    } else {
+                        statusEl.textContent = `PLAYER ${winnerIndex + 1} WINS THE ROUND!`;
+                        celebrationState = { playerIndex: winnerIndex, frame: 0 };
+                    }
+                    
+                    setTimeout(() => {
+                        restartButton.style.display = 'block';
+                    }, 2000);
+                }
+            });
+        }
+
+        function createDebris(x, y, count, color) {
+            for (let i = 0; i < count; i++) {
+                debrisParticles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    size: Math.random() * 4 + 2,
+                    life: Math.random() * 60 + 60,
+                    color: color
+                });
+            }
         }
 
         function createExplosion(x, y) {
@@ -597,6 +669,17 @@
                 tauntAnimationState.frame++;
             }
             updateClouds();
+
+            for (let i = debrisParticles.length - 1; i >= 0; i--) {
+                const p = debrisParticles[i];
+                p.vy += GRAVITY / 2;
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if (p.life <= 0) {
+                    debrisParticles.splice(i, 1);
+                }
+            }
 
             if (celestialBody && celestialBody.isHit) {
                 if (celestialBody.type === 'sun') {
@@ -686,7 +769,6 @@
                     }, 2000);
 
                     createExplosion(banana.x, banana.y);
-                    damageBuilding(banana.x, banana.y);
                     banana = null;
                     hit = true;
                 }
@@ -694,11 +776,16 @@
                 if (!hit && banana.x >= 0 && banana.x < canvas.width && banana.y >= 0 && banana.y < canvas.height) {
                     const pixelData = buildingCtx.getImageData(Math.round(banana.x), Math.round(banana.y), 1, 1).data;
                     if (pixelData[3] > 0) {
-                        statusEl.textContent = 'Miss! Hit a building.';
+                        const hitBuilding = buildings.find(b => !b.isCollapsing && banana.x >= b.x && banana.x <= b.x + b.width);
+                        if (hitBuilding) {
+                            damageBuilding(hitBuilding, banana.x, banana.y);
+                        }
                         createExplosion(banana.x, banana.y);
-                        damageBuilding(banana.x, banana.y);
+                        
+                        statusEl.textContent = 'Miss! Hit a building.';
                         banana = null;
                         hit = true;
+                        // --- MODIFIED: Removed faulty gameActive check ---
                         setTimeout(switchPlayer, 1000);
                     }
                 }
@@ -766,6 +853,7 @@
             tauntAnimationState = null;
             banana = null;
             explosions = [];
+            debrisParticles = [];
             gameActive = true;
             
             generateLevel();
