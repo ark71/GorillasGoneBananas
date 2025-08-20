@@ -98,6 +98,56 @@
             min-height: 25px;
             text-align: center;
         }
+        /* --- NEW: Styles for the gravity control knob --- */
+        .controls-container {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            background-color: #222;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 2px solid #444;
+        }
+        .controls-container label {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #ffc400;
+        }
+        #gravityKnob {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 200px;
+            height: 10px;
+            background: #444;
+            border-radius: 5px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        #gravityKnob:hover {
+            opacity: 1;
+        }
+        #gravityKnob::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            background: #ffc400;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid #111;
+        }
+        #gravityKnob::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            background: #ffc400;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid #111;
+        }
+
         #restartButton {
             margin-top: 15px;
             padding: 10px 25px;
@@ -132,6 +182,11 @@
     </div>
     <canvas id="gameCanvas" width="800" height="500"></canvas>
     <div id="status">Player 1's Turn: Click and drag to aim!</div>
+    <!-- --- NEW: Gravity control knob --- -->
+    <div class="controls-container">
+        <label for="gravityKnob">Planet: <span id="planetName">Earth</span></label>
+        <input type="range" id="gravityKnob" min="0" max="4" value="2" step="1">
+    </div>
     <button id="restartButton" style="display:none;">Play Again</button>
 
     <script>
@@ -140,6 +195,8 @@
         const ctx = canvas.getContext('2d');
         const statusEl = document.getElementById('status');
         const restartButton = document.getElementById('restartButton');
+        const gravityKnob = document.getElementById('gravityKnob');
+        const planetNameEl = document.getElementById('planetName');
         
         const buildingCanvas = document.createElement('canvas');
         buildingCanvas.width = canvas.width;
@@ -148,11 +205,20 @@
 
         const GORILLA_SIZE = { width: 40, height: 40 };
         const BANANA_SIZE = 15;
-        const GRAVITY = 0.5;
         const VELOCITY_MULTIPLIER = 0.5;
         const EXPLOSION_RADIUS = 30;
         const DAMAGE_AMOUNT = 5000;
         
+        // --- NEW: Gravity settings for different planets ---
+        const planets = [
+            { name: "Moon", value: 0.08 },
+            { name: "Mars", value: 0.19 },
+            { name: "Earth", value: 0.5 },
+            { name: "Neptune", value: 0.56 },
+            { name: "Jupiter", value: 1.25 }
+        ];
+        let GRAVITY = planets[2].value; // Default to Earth
+
         const NUM_CLOUDS = 12;
         let clouds = [];
 
@@ -785,7 +851,6 @@
                         statusEl.textContent = 'Miss! Hit a building.';
                         banana = null;
                         hit = true;
-                        // --- MODIFIED: Removed faulty gameActive check ---
                         setTimeout(switchPlayer, 1000);
                     }
                 }
@@ -880,6 +945,14 @@
             } else {
                 startNewRound();
             }
+        });
+
+        // --- NEW: Event listener for the gravity knob ---
+        gravityKnob.addEventListener('input', (e) => {
+            const planetIndex = parseInt(e.target.value);
+            const selectedPlanet = planets[planetIndex];
+            GRAVITY = selectedPlanet.value;
+            planetNameEl.textContent = selectedPlanet.name;
         });
 
         // Initial game start
