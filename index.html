@@ -21,6 +21,13 @@
             color: #ffc400;
             text-align: center;
         }
+        /* --- NEW: Style for the scoreboard --- */
+        #scoreBoard {
+            font-size: 1.5em;
+            color: #eee;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
         canvas {
             background-color: #2c3e50; /* Darker night sky */
             border: 2px solid #fff;
@@ -61,6 +68,8 @@
 <body>
 
     <h1>Gorillas Gone Bananas</h1>
+    <!-- --- NEW: Scoreboard element --- -->
+    <div id="scoreBoard">Player 1: 0 - Player 2: 0</div>
     <canvas id="gameCanvas" width="800" height="500"></canvas>
     <div id="status">Player 1's Turn: Click and drag to aim!</div>
     <button id="restartButton" style="display:none;">Play Again</button>
@@ -71,6 +80,7 @@
         const ctx = canvas.getContext('2d');
         const statusEl = document.getElementById('status');
         const restartButton = document.getElementById('restartButton');
+        const scoreBoardEl = document.getElementById('scoreBoard');
 
         const buildingCanvas = document.createElement('canvas');
         buildingCanvas.width = canvas.width;
@@ -86,8 +96,12 @@
         const NUM_CLOUDS = 12;
         let clouds = [];
 
+        // --- NEW: Scoring variables ---
+        let scores = [0, 0];
+        const WINS_NEEDED = 3;
+        let isMatchOver = false;
+
         let buildings = [];
-        // --- MODIFIED: Player object now includes physics properties for falling ---
         let players = [
             { x: 0, y: 0, isHit: false, direction: 1, vy: 0, rotation: 0 },
             { x: 0, y: 0, isHit: false, direction: -1, vy: 0, rotation: 0 }
@@ -98,6 +112,8 @@
         let explosions = [];
         let celebrationState = null;
         let throwAnimationState = null;
+        let tauntAnimationState = null; 
+
 
         // --- Mouse Control State ---
         let isAiming = false;
@@ -130,11 +146,9 @@
             const h = GORILLA_SIZE.height;
 
             if (player.isHit) {
-                // --- MODIFIED: Apply rotation when drawing the hit gorilla ---
                 ctx.translate(w / 2, h / 2);
                 ctx.rotate(player.rotation);
                 ctx.translate(-w / 2, -h / 2);
-
                 ctx.fillStyle = '#2C2C2C';
                 ctx.fillRect(w * 0.1, h * 0.25, w * 0.8, h * 0.75);
                 ctx.fillRect(w * 0.3, h * 0.05, w * 0.4, h * 0.2);
@@ -143,14 +157,12 @@
                 ctx.fillStyle = '#111';
                 ctx.fillRect(w * 0.05, h * 0.4, w * 0.2, h * 0.4);
                 ctx.fillRect(w * 0.75, h * 0.4, w * 0.2, h * 0.4);
-
                 ctx.strokeStyle = 'white';
                 ctx.lineWidth = 3;
                 const headCenterX = w * 0.5;
                 const headCenterY = h * 0.15;
                 const eyeOffsetX = w * 0.1;
                 const eyeSize = w * 0.08;
-
                 const leftEyeX = headCenterX - eyeOffsetX;
                 ctx.beginPath();
                 ctx.moveTo(leftEyeX - eyeSize, headCenterY - eyeSize);
@@ -158,7 +170,6 @@
                 ctx.moveTo(leftEyeX + eyeSize, headCenterY - eyeSize);
                 ctx.lineTo(leftEyeX - eyeSize, headCenterY + eyeSize);
                 ctx.stroke();
-                
                 const rightEyeX = headCenterX + eyeOffsetX;
                 ctx.beginPath();
                 ctx.moveTo(rightEyeX - eyeSize, headCenterY - eyeSize);
@@ -189,29 +200,35 @@
                 ctx.fillRect(w * 0.2, h * 0.4, w * 0.6, h * 0.4);
                 ctx.fillStyle = '#111';
                 ctx.fillRect(player.direction === 1 ? w * 0.05 : w * 0.75, h * 0.4, w * 0.2, h * 0.4);
-
                 const armPivotX = player.direction === 1 ? w * 0.75 : w * 0.25;
                 const armPivotY = h * 0.4;
                 const frame = throwAnimationState.frame;
                 let armAngle = 0;
-
-                if (frame < 10) {
-                    armAngle = (frame / 10) * -Math.PI / 2;
-                } else if (frame < 20) {
-                    armAngle = -Math.PI / 2 + ((frame - 10) / 10) * Math.PI;
-                } else {
-                    armAngle = Math.PI / 2;
-                }
-                
+                if (frame < 10) { armAngle = (frame / 10) * -Math.PI / 2; }
+                else if (frame < 20) { armAngle = -Math.PI / 2 + ((frame - 10) / 10) * Math.PI; }
+                else { armAngle = Math.PI / 2; }
                 if (player.direction === -1) armAngle *= -1;
-
                 ctx.save();
                 ctx.translate(armPivotX, armPivotY);
                 ctx.rotate(armAngle);
                 ctx.fillStyle = '#111';
                 ctx.fillRect(0, 0, w * 0.2, h * 0.4);
                 ctx.restore();
-
+            } else if (tauntAnimationState && tauntAnimationState.playerIndex === playerIndex) {
+                ctx.fillStyle = '#2C2C2C';
+                ctx.fillRect(w * 0.1, h * 0.25, w * 0.8, h * 0.75);
+                ctx.fillRect(w * 0.3, h * 0.05, w * 0.4, h * 0.2);
+                ctx.fillStyle = '#555';
+                ctx.fillRect(w * 0.2, h * 0.4, w * 0.6, h * 0.4);
+                const tauntFrame = Math.floor(tauntAnimationState.frame / 8) % 4;
+                ctx.fillStyle = '#111';
+                let leftArm = { x: w * 0.05, y: h * 0.4, width: w * 0.2, height: h * 0.4 };
+                let rightArm = { x: w * 0.75, y: h * 0.4, width: w * 0.2, height: h * 0.4 };
+                if (tauntFrame === 1) { leftArm.x = w * 0.25; }
+                else if (tauntFrame === 3) { rightArm.x = w * 0.55; }
+                ctx.fillRect(leftArm.x, leftArm.y, leftArm.width, leftArm.height);
+                ctx.fillRect(rightArm.x, rightArm.y, rightArm.width, rightArm.height);
+                
             } else {
                 ctx.fillStyle = '#2C2C2C';
                 ctx.fillRect(w * 0.1, h * 0.25, w * 0.8, h * 0.75);
@@ -245,6 +262,7 @@
             ctx.restore();
         }
         
+        // --- MODIFIED: Removed taunt check to allow banana to be held during taunt ---
         function drawHeldBanana() {
             if (!gameActive || banana || throwAnimationState) return;
             const player = players[currentPlayer];
@@ -311,6 +329,10 @@
         }
 
         // --- Game Logic ---
+        function updateScoreboard() {
+            scoreBoardEl.textContent = `Player 1: ${scores[0]} - Player 2: ${scores[1]}`;
+        }
+
         function generateClouds() {
             clouds = [];
             for (let i = 0; i < NUM_CLOUDS; i++) {
@@ -374,6 +396,8 @@
             currentPlayer = (currentPlayer === 0) ? 1 : 0;
             statusEl.textContent = `Player ${currentPlayer + 1}'s Turn: Click and drag to aim!`;
             gameActive = true;
+            const opponentIndex = 1 - currentPlayer;
+            tauntAnimationState = { playerIndex: opponentIndex, frame: 0 };
         }
 
         function damageBuilding(x, y) {
@@ -412,20 +436,21 @@
             if (celebrationState) {
                 celebrationState.frame++;
             }
+            if (tauntAnimationState) {
+                tauntAnimationState.frame++;
+            }
             updateClouds();
 
-            // --- NEW: Update physics for falling gorillas ---
             players.forEach(player => {
                 if (player.isHit && player.y < canvas.height + GORILLA_SIZE.height) {
                     player.vy += GRAVITY;
                     player.y += player.vy;
-                    player.rotation += player.direction * 0.05; // Rotate based on which way they face
+                    player.rotation += player.direction * 0.05;
                 }
             });
 
             if (throwAnimationState) {
                 throwAnimationState.frame++;
-
                 if (throwAnimationState.frame === 15) {
                     const { playerIndex, angle, velocity } = throwAnimationState;
                     const angleRad = (playerIndex === 0) ? angle * Math.PI / 180 : (180 - angle) * Math.PI / 180;
@@ -436,7 +461,6 @@
                         rotation: 0
                     };
                 }
-
                 if (throwAnimationState.frame > 25) {
                     throwAnimationState = null;
                 }
@@ -452,20 +476,28 @@
                     banana.vx = 0;
                 }
 
-                const opponent = players[currentPlayer === 0 ? 1 : 0];
+                const opponent = players[1 - currentPlayer];
                 let hit = false;
 
                 if (!opponent.isHit && banana.x > opponent.x && banana.x < opponent.x + GORILLA_SIZE.width &&
                     banana.y > opponent.y && banana.y < opponent.y + GORILLA_SIZE.height) {
                     
-                    statusEl.textContent = `PLAYER ${currentPlayer + 1} WINS! 🎉`;
                     opponent.isHit = true;
-                    // --- NEW: Give the gorilla an initial upward pop before falling ---
                     opponent.vy = -5; 
                     gameActive = false;
-                    celebrationState = { playerIndex: currentPlayer, frame: 0 };
+                    tauntAnimationState = null;
                     
-                    // Delay showing the restart button to let the fall animation play out
+                    scores[currentPlayer]++;
+                    updateScoreboard();
+
+                    if (scores[currentPlayer] >= WINS_NEEDED) {
+                        statusEl.textContent = `PLAYER ${currentPlayer + 1} WINS THE MATCH! 🏆`;
+                        isMatchOver = true;
+                    } else {
+                        statusEl.textContent = `PLAYER ${currentPlayer + 1} WINS THE ROUND!`;
+                        celebrationState = { playerIndex: currentPlayer, frame: 0 };
+                    }
+                    
                     setTimeout(() => {
                         restartButton.style.display = 'block';
                     }, 2000);
@@ -520,6 +552,7 @@
 
         canvas.addEventListener('mousedown', (e) => {
             if (!gameActive) return;
+            tauntAnimationState = null;
             isAiming = true;
             aimStart = getMousePos(e);
             aimEnd = getMousePos(e);
@@ -541,26 +574,43 @@
             if (isAiming) isAiming = false;
         });
         
-        // --- Initialization ---
-        function initializeGame() {
+        function startNewRound() {
             restartButton.style.display = 'none';
             celebrationState = null;
             throwAnimationState = null;
-            currentPlayer = 0;
+            tauntAnimationState = null;
             banana = null;
             explosions = [];
             gameActive = true;
-            generateClouds();
+            
             generateLevel();
+            
             statusEl.textContent = `Player ${currentPlayer + 1}'s Turn: Click and drag to aim!`;
+            const opponentIndex = 1 - currentPlayer;
+            tauntAnimationState = { playerIndex: opponentIndex, frame: 0 };
+        }
+
+        function startNewMatch() {
+            scores = [0, 0];
+            isMatchOver = false;
+            currentPlayer = 0;
+            updateScoreboard();
+            generateClouds();
+            startNewRound();
         }
         
-        restartButton.addEventListener('click', initializeGame);
+        restartButton.addEventListener('click', () => {
+            if (isMatchOver) {
+                startNewMatch();
+            } else {
+                startNewRound();
+            }
+        });
 
-        initializeGame();
+        // Initial game start
+        startNewMatch();
         gameLoop();
 
     </script>
 </body>
 </html>
-
