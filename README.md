@@ -1,8 +1,8 @@
-🍌 Gorillas Gone Bananas 🍌
+🍌 **Gorillas Gone Bananas** 🍌
 
 Welcome to Gorillas Gone Bananas, a modern twist on the classic artillery game! Perched atop destructible, randomly generated skyscrapers, two gorillas battle it out by hurling explosive bananas at each other. This game is a tribute to the original QBasic classic, rebuilt in HTML5 Canvas with a host of new features and animations.
 
-✨ Features
+✨ **Features**
 
 Classic Artillery Gameplay: A simple yet deeply strategic turn-based battle.
 
@@ -18,7 +18,7 @@ Adjustable Gravity: A "Planet Selector" knob lets you change the gravity to matc
 
 Multiple Difficulty Levels: A full range of difficulty options to suit any player.
 
-🎮 How to Play
+🎮 **How to Play**
 
 The objective is simple: be the first player to hit your opponent with a banana 3 times to win the match!
 
@@ -42,7 +42,7 @@ Type your desired Angle (0-180) and Velocity into the input boxes.
 
 Click the FIRE! button to launch your banana.
 
-Levels of Difficulty
+**Levels of Difficulty**
 
 Baby: Shows the full predicted trajectory of your banana.
 
