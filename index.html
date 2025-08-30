@@ -89,6 +89,7 @@
             cursor: crosshair;
             max-width: 100%;
             height: auto;
+            touch-action: none; /* Prevent default touch actions like scrolling */
         }
         #status {
             margin-top: 10px;
@@ -184,7 +185,6 @@
         }
 
         #restartButton {
-            /* --- MODIFIED: Removed top margin --- */
             padding: 10px 25px;
             font-size: 1.1em;
             font-family: 'Courier New', Courier, monospace;
@@ -233,7 +233,6 @@
             </div>
             <button id="fireButton">FIRE!</button>
         </div>
-        <!-- --- MODIFIED: Moved restart button inside controls --- -->
         <button id="restartButton" style="display:none;">Play Again</button>
     </div>
 
@@ -257,10 +256,11 @@
         buildingCanvas.height = canvas.height;
         const buildingCtx = buildingCanvas.getContext('2d');
 
-        const GORILLA_SIZE = { width: 40, height: 40 };
-        const BANANA_SIZE = 15;
+        // --- MODIFIED: Scaled down game elements ---
+        const GORILLA_SIZE = { width: 30, height: 30 };
+        const BANANA_SIZE = 12;
         const VELOCITY_MULTIPLIER = 0.5;
-        const EXPLOSION_RADIUS = 30;
+        const EXPLOSION_RADIUS = 22;
         
         const planets = [
             { name: "Moon", value: 0.08 },
@@ -551,13 +551,6 @@
             }
         }
 
-        function drawDebris() {
-            debrisParticles.forEach(p => {
-                ctx.fillStyle = p.color;
-                ctx.fillRect(p.x, p.y, p.size, p.size);
-            });
-        }
-
         function drawAimingGuide() {
             if (!isAiming || !gameActive) return;
 
@@ -583,17 +576,37 @@
                     let projY = startY;
                     let vx = Math.cos(angleRad) * (velocity / 5);
                     let vy = -Math.sin(angleRad) * (velocity / 5);
-                    const arcLength = difficultyLevel === 0 ? 100 : 50;
+                    const arcLength = difficultyLevel === 0 ? 200 : 50;
 
                     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
                     ctx.beginPath();
+                    
                     for (let i = 0; i < arcLength; i++) {
                         vy += GRAVITY;
                         projX += vx;
                         projY += vy;
+
                         if (i % 5 === 0) {
                             ctx.moveTo(projX, projY);
                             ctx.arc(projX, projY, 2, 0, Math.PI * 2);
+                        }
+                        
+                        if (projX < 0 || projX > canvas.width || projY > canvas.height) {
+                            break;
+                        }
+
+                        if (difficultyLevel === 0 && projY > 0 && projX > 0 && projX < canvas.width) {
+                            const pixelData = buildingCtx.getImageData(Math.round(projX), Math.round(projY), 1, 1).data;
+                            if (pixelData[3] > 0) {
+                                ctx.strokeStyle = 'red';
+                                ctx.lineWidth = 2;
+                                ctx.moveTo(projX - 10, projY);
+                                ctx.lineTo(projX + 10, projY);
+                                ctx.moveTo(projX, projY - 10);
+                                ctx.lineTo(projX, projY + 10);
+                                ctx.stroke();
+                                break;
+                            }
                         }
                     }
                     ctx.fill();
@@ -613,7 +626,7 @@
         }
 
         function drawLastThrowInfo() {
-            if (isAiming || difficultyLevel > 1 || !gameActive || throwAnimationState) return;
+            if (isAiming || difficultyLevel > 0 || !gameActive || throwAnimationState) return;
 
             const player = players[currentPlayer];
             if (player.lastAngle === null || player.lastVelocity === null) return;
@@ -636,7 +649,6 @@
             drawCelestialBody();
             drawClouds();
             drawBuildings();
-            drawDebris();
             players.forEach((player, index) => drawGorilla(player, index));
             drawHeldBanana();
             drawBanana();
@@ -704,8 +716,8 @@
             buildings = [];
             let currentX = 0;
             while (currentX < canvas.width) {
-                const width = 60 + Math.random() * 60;
-                const height = 150 + Math.random() * 250;
+                const width = 45 + Math.random() * 45;
+                const height = 112 + Math.random() * 187;
                 const building = { 
                     x: currentX, 
                     y: canvas.height - height, 
@@ -752,20 +764,6 @@
             buildingCtx.restore();
         }
         
-        function createDebris(x, y, count, color) {
-            for (let i = 0; i < count; i++) {
-                debrisParticles.push({
-                    x: x,
-                    y: y,
-                    vx: (Math.random() - 0.5) * 6,
-                    vy: (Math.random() - 0.5) * 6,
-                    size: Math.random() * 4 + 2,
-                    life: Math.random() * 60 + 60,
-                    color: color
-                });
-            }
-        }
-
         function createExplosion(x, y) {
             const particles = [];
             for (let i = 0; i < 30; i++) {
@@ -799,17 +797,6 @@
                 tauntAnimationState.frame++;
             }
             updateClouds();
-
-            for (let i = debrisParticles.length - 1; i >= 0; i--) {
-                const p = debrisParticles[i];
-                p.vy += GRAVITY / 2;
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life--;
-                if (p.life <= 0) {
-                    debrisParticles.splice(i, 1);
-                }
-            }
 
             if (celestialBody && celestialBody.isHit) {
                 if (celestialBody.type === 'sun') {
@@ -902,7 +889,7 @@
                 if (!hit && banana.x >= 0 && banana.x < canvas.width && banana.y >= 0 && banana.y < canvas.height) {
                     const pixelData = buildingCtx.getImageData(Math.round(banana.x), Math.round(banana.y), 1, 1).data;
                     if (pixelData[3] > 0) {
-                        const hitBuilding = buildings.find(b => !b.isCollapsing && banana.x >= b.x && banana.x <= b.x + b.width);
+                        const hitBuilding = buildings.find(b => banana.x >= b.x && banana.x <= b.x + b.width);
                         if (hitBuilding) {
                             damageBuilding(hitBuilding, banana.x, banana.y);
                         }
@@ -927,10 +914,34 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // --- Mouse Event Handlers ---
-        function getMousePos(evt) {
+        // --- Mouse and Touch Event Handlers ---
+        function getEventPos(evt) {
             const rect = canvas.getBoundingClientRect();
-            return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+            const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+            const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function handleAimStart(evt) {
+            if (!gameActive || difficultyLevel === 4) return;
+            evt.preventDefault();
+            tauntAnimationState = null;
+            isAiming = true;
+            aimStart = getEventPos(evt);
+            aimEnd = getEventPos(evt);
+        }
+
+        function handleAimMove(evt) {
+            if (!isAiming) return;
+            evt.preventDefault();
+            aimEnd = getEventPos(evt);
+        }
+
+        function handleAimEnd() {
+            if (!isAiming) return;
+            isAiming = false;
+            const { angle, velocity } = getAimValues();
+            fireBanana(angle, velocity);
         }
 
         function getAimValues() {
@@ -947,29 +958,14 @@
             return { angle, velocity };
         }
 
-        canvas.addEventListener('mousedown', (e) => {
-            if (!gameActive || difficultyLevel === 4) return;
-            tauntAnimationState = null;
-            isAiming = true;
-            aimStart = getMousePos(e);
-            aimEnd = getMousePos(e);
-        });
+        canvas.addEventListener('mousedown', handleAimStart);
+        canvas.addEventListener('mousemove', handleAimMove);
+        canvas.addEventListener('mouseup', handleAimEnd);
+        canvas.addEventListener('mouseleave', handleAimEnd);
 
-        canvas.addEventListener('mousemove', (e) => {
-            if (!isAiming) return;
-            aimEnd = getMousePos(e);
-        });
-
-        canvas.addEventListener('mouseup', (e) => {
-            if (!isAiming) return;
-            isAiming = false;
-            const { angle, velocity } = getAimValues();
-            fireBanana(angle, velocity);
-        });
-        
-        canvas.addEventListener('mouseleave', (e) => {
-            if (isAiming) isAiming = false;
-        });
+        canvas.addEventListener('touchstart', handleAimStart);
+        canvas.addEventListener('touchmove', handleAimMove);
+        canvas.addEventListener('touchend', handleAimEnd);
         
         function startNewRound() {
             restartButton.style.display = 'none';
